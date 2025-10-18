@@ -146,34 +146,47 @@ class SAFA(nn.Module):
             nn.PixelShuffle(2),
         )
 
+# /content/WACV2024-SAFA/model/flownet.py (SAFA 클래스 내)
+
 def inference(self, lowres, timestep=0.5):
+    print(f"SAFA.inference input shape: {lowres.shape}, timestep: {timestep}")
     if isinstance(timestep, list):
         one = torch.tensor([1.]).to(lowres.device).reshape(1, 1, 1, 1)
         one = one.repeat(lowres.shape[0], 1, lowres.shape[2], lowres.shape[3])
         one = F.interpolate(one, scale_factor=0.5, mode="bilinear")
-        return [self.forward(lowres, t) for t in timestep]  # forward 호출
+        results = [self.forward(lowres, t) for t in timestep]
+        print(f"SAFA.inference result length: {len(results)}, shapes: {[r.shape for r in results]}")
+        return results
     else:
-        return self.forward(lowres, timestep)
-                timestep = torch.tensor(timestep).reshape(1, 1, 1, 1).repeat(lowres.shape[0], 1, 1, 1).to(device)
-            timestep = timestep.repeat(1, 1, lowres.shape[2], lowres.shape[3])
-            timestep = F.interpolate(timestep, scale_factor=0.5, mode="bilinear")
-            one = 1-timestep*0
-            timestep_list = [one*0, timestep, one]
+        # 3배 보간을 위한 타임스텝 (0.333, 0.666)
+        timestep_tensor = torch.tensor([0.333333, 0.666667]).to(lowres.device).float()
+        timestep_tensor = timestep_tensor.reshape(1, 2, 1, 1).repeat(lowres.shape[0], 1, lowres.shape[2], lowres.shape[3])
+        timestep_tensor = F.interpolate(timestep_tensor, scale_factor=0.5, mode="bilinear")
+        
         merged = []
         feat, i0, i1 = self.block.extract_feat(lowres)
-        for timestep in timestep_list:
-            flow_list, feat_list, soft_scale = self.block(i0, i1, feat, timestep, (lowres[:, :6] * 0).detach())
-            flow_sum = flow_list[-1]
-            warped_i0 = warp(lowres[:, :3], flow_sum[:, :2])
-            warped_i1 = warp(lowres[:, -3:], flow_sum[:, 2:4])
-            mask = torch.sigmoid(flow_sum[:, 4:5])
-            warped = warped_i0 * mask + warped_i1 * (1 - mask)
-            flow_down = F.interpolate(flow_sum, scale_factor=0.5, mode="bilinear")
-            w0 = warp(i0, flow_down[:, :2] * 0.5)
-            w1 = warp(i1, flow_down[:, 2:4] * 0.5)
-            img = self.lastconv(torch.cat((timestep, w0, w1), 1))
-            merged.append(torch.clamp(warped + img, 0, 1))
+        for t_step in timestep_tensor.chunk(2, dim=1):  # 2개로 분할
+            result = self.forward(lowres, t_step.squeeze(1))
+            merged.append(result)
+        print(f"SAFA.inference result length: {len(merged)}, shapes: {[r.shape for r in merged]}")
         return merged
+
+def forward(self, lowres, timestep=0.5, training=False):
+    print(f"SAFA.forward input shape: {lowres.shape}, timestep: {timestep}")
+    img0 = lowres[:, :3]  # 첫 3채널
+    img1 = lowres[:, -3:]  # 마지막 3채널
+    if not torch.is_tensor(timestep):
+        timestep = torch.tensor(timestep, device=lowres.device).float()
+    timestep = timestep.reshape(1, 1, 1, 1).repeat(lowres.shape[0], 1, lowres.shape[2], lowres.shape[3])
+    timestep = F.interpolate(timestep, scale_factor=0.5, mode="bilinear")
+    
+    # 실제 보간 로직 (flownet 참조)
+    feat, i0, i1 = self.block.extract_feat(lowres)
+    # flownet 기반 보간 (예시: 실제 구현으로 교체)
+    flow, scale, merged = self.flownet(lowres, timestep=timestep, training=training)
+    result = merged  # 실제 결과 반환
+    print(f"SAFA.forward output shape: {result.shape}")
+    return result
         
     def forward(self, lowres, timestep=0.5, training=False):
         img0 = lowres[:, :3]
