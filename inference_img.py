@@ -32,7 +32,7 @@ def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"[INFO] Device: {device}")
 
-    # 출력 폴더
+    # 출력 폴더 생성
     os.makedirs('output', exist_ok=True)
 
     # 이미지 로드
@@ -59,18 +59,22 @@ def main():
     print(f"[INFO] 보간 시점: {time_list}")
 
     # =====================================
-    #  보간 실행 루프
+    #  보간 실행 루프 (저장 포함)
     # =====================================
     torch.cuda.empty_cache()
+    img_list = []
+
     for idx, t in enumerate(time_list):
-        print(f"[INFO] {idx+1}/{len(time_list)} 프레임 보간 중... (t={t:.3f})")
+        print(f"[INFO] Interpolating frame {idx+1}/{len(time_list)} at t={t:.3f}")
         with torch.no_grad():
-            out = model.inference(img0, img1, timestep=float(t))
-            out_img = (out[0].detach().cpu().numpy().transpose(1, 2, 0) * 255).astype('uint8')
-            out_img = cv2.cvtColor(out_img, cv2.COLOR_RGB2BGR)
-            out_path = os.path.join('output', f'img{idx+1}.png')
-            cv2.imwrite(out_path, out_img)
-            print(f"[SAVED] {out_path}")
+            img = model.inference(img0, img1, timestep=float(t))
+            img_list.append(img)
+
+            # 🔧 저장 루프 (GPU → CPU → NumPy 변환)
+            out = (img[0].detach().cpu().numpy().transpose(1, 2, 0) * 255).astype('uint8')
+            filename = os.path.join('output', f'img{idx+1}.png')
+            cv2.imwrite(filename, out)
+            print(f"[SAVED] {filename}")
 
     print("[DONE] 모든 보간 프레임 저장 완료 ✅")
 
