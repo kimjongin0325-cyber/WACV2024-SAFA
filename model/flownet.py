@@ -146,15 +146,14 @@ class SAFA(nn.Module):
             nn.PixelShuffle(2),
         )
 
-    def inference(self, lowres, timestep=0.5):
-        if isinstance(timestep, list):
-            one = torch.tensor([1.]).reshape(1, 1, 1, 1).repeat(lowres.shape[0], 1, lowres.shape[2], lowres.shape[3]).to(device)
-            one = F.interpolate(one, scale_factor=0.5, mode="bilinear")
-            timestep_list = []
-            for i in timestep:
-                timestep_list.append(one * i)
-        else:
-            if not torch.is_tensor(timestep):
+def inference(self, lowres, timestep=0.5):
+    if isinstance(timestep, list):
+        one = torch.tensor([1.]).to(lowres.device).reshape(1, 1, 1, 1)
+        one = one.repeat(lowres.shape[0], 1, lowres.shape[2], lowres.shape[3])
+        one = F.interpolate(one, scale_factor=0.5, mode="bilinear")
+        return [self.forward(lowres, t) for t in timestep]  # forward 호출
+    else:
+        return self.forward(lowres, timestep)
                 timestep = torch.tensor(timestep).reshape(1, 1, 1, 1).repeat(lowres.shape[0], 1, 1, 1).to(device)
             timestep = timestep.repeat(1, 1, lowres.shape[2], lowres.shape[3])
             timestep = F.interpolate(timestep, scale_factor=0.5, mode="bilinear")
