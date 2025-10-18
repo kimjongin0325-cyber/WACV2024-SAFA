@@ -1,3 +1,5 @@
+# /content/WACV2024-SAFA/model/flownet.py (전체 파일 수정)
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -121,6 +123,8 @@ class Flownet(nn.Module):
             scale_list.append(scale)
         return flow_list, feat_list, torch.cat(scale_list, 1)
         
+# ... (conv, conv_bn, Resblock, RoundSTE, RecurrentBlock 등 기존 함수/클래스 생략)
+
 class SAFA(nn.Module):
     def __init__(self):
         super(SAFA, self).__init__()
